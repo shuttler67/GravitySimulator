@@ -28,10 +28,10 @@ def gravity(body1Mass,body1Position,body2Mass,body2Position):
 	distance = Vector2D(body2Position.x-body1Position.x,body2Position.y-body1Position.y) # distance from self to body2
 	if distance.power > maxdistance:
 		maxdistance = distance.power
-		print "MAX",maxdistance, body1Position.x, body1Position.y
+		print "MAX",maxdistance, bodies[0].position.x, bodies[0].position.y
 	if distance.power < mindistance:
 		mindistance = distance.power
-		print "MIN",mindistance, body1Position.x, body1Position.y
+		print "MIN",mindistance, bodies[0].position.x, bodies[0].position.y
 
 	force = G*(body1Mass*body2Mass) / math.pow(distance.power,2) # indirectional force acting on both bodies
 	force1 = Vector2D(distance.x/distance.power * force, distance.y/distance.power * force) # directional force acting on body1
@@ -114,32 +114,35 @@ class Body:
 		self.mass = mass
 		self.velocity = Vector2D(vX,vY)
 		self.acceleration = Vector2D(0.0,0.0)
+		self.force = Vector2D(0.0,0.0)
 		self.radius = radius
 		self.trace = []
 	def handleForce(self,force):
-		self.acceleration.x += force.x/self.mass
-		self.acceleration.y += force.y/self.mass	
-	def move(self): 			
+		self.force.x += force.x
+		self.force.y += force.y
+	def move(self): 		
+		self.acceleration.x += self.force.x/self.mass
+		self.acceleration.y += self.force.y/self.mass	
 		self.velocity.x += self.acceleration.x*86400
 		self.velocity.y += self.acceleration.y*86400
 		self.position.x += self.velocity.x*86400
 		self.position.y += self.velocity.y*86400
+		self.acceleration = Vector2D(0.0,0.0)
+		self.force = Vector2D(0.0,0.0)
 	def draw(self):
-		self.trace.append((self.position.x,scaleMetersToPixels(self.position.y)))
+		self.trace.append((self.position.x,self.position.y))
 		if self.name == "Sun":
 			useColour(255,0,0,255)
 		else:
 			useColour(0,0,255,255)
 		drawCircle(scaleMetersToPixels(self.position.x)+cameraX,scaleMetersToPixels(self.position.y)+cameraY,scaleMetersToPixels(self.radius))
 		drawString(scaleMetersToPixels(self.position.x)-len(self.name)*5+cameraX,scaleMetersToPixels(self.position.y)-scaleMetersToPixels(self.radius)-17+cameraY,self.name)
-		self.acceleration.x = 0
-		self.acceleration.y = 0
 		for point in self.trace:
-			drawPoint(point[0]+cameraX,point[1]+cameraY)
+			drawPoint(scaleMetersToPixels(point[0])+cameraX,scaleMetersToPixels(point[1])+cameraY)
 		
 buttons = [Button(0,_screenHeight-35,150,'pause','pause')]
-bodies = [Body("Earth",152098232000.0,0.0,5.97219*math.pow(10,24),0,29800,63781000.0),Body("Sun",0.0,0.0,1.9891*math.pow(10,30),0.0,0.0,6955000000.0)]
-#29951.7
+bodies = [Body("Planet X",152098232000.0,0.0,5.97219*math.pow(10,24),0,40340,63781000.0),Body("Vega",0.0,6955000000.0,1.9891*math.pow(10,30),-85000,0.0,6955000000.0),Body("Capricorn",0.0,-6955000000.0,1.9891*math.pow(10,30),85000,0.0,6955000000.0)]
+# Body("Planet X",152098232000.0,0.0,5.97219*math.pow(10,24),0,40340,63781000.0),
 
 
 for body in bodies:
@@ -150,10 +153,11 @@ while True:
 	PREVIOUSscreenHeight = _screenHeight
 	PREVIOUSisLeftMouseDown = isLeftMouseDown()
 	newFrame()
-	
-	distanceScaleFactor += (getMouseWheelDelta()/120)/5600000000
-	if distanceScaleFactor < 2/560000000:
-		distanceScaleFactor = 1/5600000000
+	scroll = getMouseWheelDelta()
+	if scroll >= 120:
+		distanceScaleFactor *= 1.25
+	if scroll <= -120:
+		distanceScaleFactor *= 0.8
 
 	if PREVIOUSscreenHeight != _screenHeight or PREVIOUSscreenWidth != _screenWidth:
 		cameraX = _screenWidth/2
@@ -210,7 +214,9 @@ while True:
 		
 				body1.handleForce(force1)
 				body2.handleForce(force2)
-
+				if time % 50 == 0:
+					print body1.name, body1.force.x, force1.x, body1.force.x + force1.x
+					print body2.name, body2.force.x, force1.x, body2.force.x + force2.x
 	
 		for body in bodies:
 			body.move()
