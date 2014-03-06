@@ -15,7 +15,6 @@ distanceScaleFactor = 1/280000000.0
 #time unit: seconds
 #mass unit: kilograms
 #distance unit: meters
-print G*((1.9891*math.pow(10,30)*5.97219 * math.pow(10,24))/ math.pow(149600000000.0,2.0))
 
 def drawImageRect(image,rect):
 		drawImage(image,rect.x1+rect.width/2,rect.y1+rect.height/2,rect.width,rect.height)
@@ -139,10 +138,12 @@ class Body:
 		drawString(scaleMetersToPixels(self.position.x)-len(self.name)*5+cameraX,scaleMetersToPixels(self.position.y)-scaleMetersToPixels(self.radius)-17+cameraY,self.name)
 		for point in self.trace:
 			drawPoint(scaleMetersToPixels(point[0])+cameraX,scaleMetersToPixels(point[1])+cameraY)
-		
-buttons = [Button(0,_screenHeight-35,150,'pause','pause')]
-bodies = [Body("Planet X",152098232000.0,0.0,5.97219*math.pow(10,24),0,40340,63781000.0),Body("Vega",0.0,6955000000.0,1.9891*math.pow(10,30),-85000,0.0,6955000000.0),Body("Capricorn",0.0,-6955000000.0,1.9891*math.pow(10,30),85000,0.0,6955000000.0)]
+print math.sqrt(G*1.9891*math.pow(10,30)*(2.0/30550000000.0-1.0/30550000000.0)
+butt = [0,1]
+butt.append(Button(0,_screenHeight-35,150,'pause','pause'))
+bodies = [Body("Vega",0.0,30550000000,1.9891*math.pow(10,30),math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/30550000000)),0.0,6955000000.0),Body("Capricorn",0.0,-30550000000,1.9891*math.pow(10,30),math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/30550000000)),0.0,6955000000.0)]
 # Body("Planet X",152098232000.0,0.0,5.97219*math.pow(10,24),0,40340,63781000.0),
+#-math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/28550000000))
 
 
 for body in bodies:
