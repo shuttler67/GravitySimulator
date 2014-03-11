@@ -1,17 +1,11 @@
+
 import math
 
 buttonUp = loadImage('res/buttonUp.png')
 buttonDown = loadImage('res/buttonDown.png')
 
-G =  6.67428*math.pow(10,-11) #gravitational constant, unit: N(m/kg)^2 
-time = 0
-pause = False
-maxdistance = 0
-mindistance = 1000000000000000000000000
-cameraX = _screenWidth/2
-cameraY = _screenHeight/2
+G =  6.67428*math.pow(10,-11) #gravitational constant, unit: N(km/kg)^2 
 
-distanceScaleFactor = 1/280000000.0
 #time unit: seconds
 #mass unit: kilograms
 #distance unit: meters
@@ -22,23 +16,30 @@ def drawImageRect(image,rect):
 def scaleMetersToPixels(distance):
 	return distance*distanceScaleFactor
 
-def gravity(body1Mass,body1Position,body2Mass,body2Position):
-	global maxdistance, mindistance
-	distance = Vector2D(body2Position.x-body1Position.x,body2Position.y-body1Position.y) # distance from self to body2
-	if distance.power > maxdistance:
-		maxdistance = distance.power
-		print "MAX",maxdistance, bodies[0].position.x, bodies[0].position.y
-	if distance.power < mindistance:
-		mindistance = distance.power
-		print "MIN",mindistance, bodies[0].position.x, bodies[0].position.y
-
+def gravity(body1Mass,body2Mass,distance):
 	force = G*(body1Mass*body2Mass) / math.pow(distance.power,2) # indirectional force acting on both bodies
 	force1 = Vector2D(distance.x/distance.power * force, distance.y/distance.power * force) # directional force acting on body1
 	force2 = Vector2D(distance.x/distance.power *-force, distance.y/distance.power *-force) # directional force acting on body2 (opposite direction of force1)
 	return force1,force2
 
+#             Colours
+#	   R   G   B Alpha
+#RED   = (255, 0 , 0 ,255)
+#GREEN = ( 0 ,200, 40 ,255)
+#BLACK = ( 0 , 0 , 0 ,255)
+
+def useColourList(colour):
+	if colour == 'red':
+		useColour(255, 0 , 0 ,255)
+	if colour == 'green':
+		useColour(0,204,0,255)
+	if colour == 'blue':
+		useColour(0,128,255,255)
+	if colour == 'orange':
+		useColour(255,128,0,255)
+
 def printScales():
-	global time
+	global time,currentOrbit,mindistance,maxdistance
 	if distanceScaleFactor == 0:
 		Dscale = str(0)
 	else:
@@ -53,6 +54,10 @@ def printScales():
 	drawString(_screenWidth-len(text1)*12,_screenHeight-height*2-10,text1)
 	drawString(_screenWidth-len(text1)*12,_screenHeight-height*3-10,text2)
 	drawString(_screenWidth-len(text3)*12,_screenHeight-height*4-10,text3)
+	drawString(0,0,"Orbit: "+str(currentOrbit+1))
+	drawString(_screenWidth-200,height,"maxdistance: "+str(maxdistance))
+	drawString(_screenWidth-200,0,"mindistance: "+str(mindistance))
+
 
 class Rect:
 	def __init__(self,x,y,w,h):
@@ -102,13 +107,16 @@ class Vector2D:
 	def __init__(self,x,y):
 		self.x = x
 		self.y = y
-		self.power = math.hypot(x,y)
+		self.power = math.hypot(self.x,self.y)
 	def vectorAdd(self,vector2):
 		self.x += vector2.x
 		self.y += vector2.y
+	def update(self):
+		self.power = math.hypot(self.x,self.y)
 class Body:
-	def __init__(self,name,x,y,mass,vX,vY,radius):
+	def __init__(self,name,x,y,mass,vX,vY,radius,colour):
 		self.name = name
+		self.colour = colour
 		self.position = Vector2D(x,y)
 		self.mass = mass
 		self.velocity = Vector2D(vX,vY)
@@ -130,27 +138,84 @@ class Body:
 		self.force = Vector2D(0.0,0.0)
 	def draw(self):
 		self.trace.append((self.position.x,self.position.y))
-		if self.name == "Sun":
-			useColour(255,0,0,255)
+		if self.name == 'Planet 0080FF':
+			traceSize = 2000
 		else:
-			useColour(0,0,255,255)
+			traceSize = 200
+		if len(self.trace) > traceSize:
+			self.trace.pop(0)
+		useColourList(self.colour)
 		drawCircle(scaleMetersToPixels(self.position.x)+cameraX,scaleMetersToPixels(self.position.y)+cameraY,scaleMetersToPixels(self.radius))
 		drawString(scaleMetersToPixels(self.position.x)-len(self.name)*5+cameraX,scaleMetersToPixels(self.position.y)-scaleMetersToPixels(self.radius)-17+cameraY,self.name)
 		for point in self.trace:
 			drawPoint(scaleMetersToPixels(point[0])+cameraX,scaleMetersToPixels(point[1])+cameraY)
-print math.sqrt(G*1.9891*math.pow(10,30)*(2.0/30550000000.0-1.0/30550000000.0)
-bodies = [Body("Vega",0.0,30550000000,1.9891*math.pow(10,30),math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/30550000000)),0.0,6955000000.0),Body("Capricorn",0.0,-30550000000,1.9891*math.pow(10,30),math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/30550000000)),0.0,6955000000.0)]
+
+def readOrbitFile():
+	orbitFile = open('Orbits.txt','r') 
+	data = orbitFile.readlines() + ['\r\n']
+	orbitFile.close()
+	orbit = []
+	allOrbits =[]
+	for lineNum in range(len(data)):
+		line = data[lineNum].rstrip('\r\n')
+		if '#' in line:
+			line = line[:line.find('#')]
+		if line !='':
+			words = line.split(',')
+			for i in range(len(words)):
+				if i > 0 and i < 6:
+					words[i] = float(words[i])
+				print words[i]
+			if words[3] != 0:
+				speed = math.sqrt(G*words[3]*(2.0/abs(words[1])-1.0/words[4]))
+				if words[1]<0:
+					speed *= -1
+			else:
+				speed = 0
+			orbit.append((words[0],words[1],0.0,words[2],0.0,speed,words[5],words[6]))
+		elif len(orbit) > 0:
+			allOrbits.append(orbit)
+			orbit = []
+	return allOrbits
+currentOrbit = 0
+
+def createBodies(bodyTuples):
+	listofBodies =[]
+	for bodyTuple in bodyTuples:
+		listofBodies.append(Body(bodyTuple[0],bodyTuple[1],bodyTuple[2],bodyTuple[3],bodyTuple[4],bodyTuple[5],bodyTuple[6],bodyTuple[7]))
+	return listofBodies
+
+
+#print math.sqrt(G*1.9891*math.pow(10,30)*(2.0/30550000000.0-1.0/30550000000.0)
+#bodies = [Body("Vega",0.0,30550000000,1.9891*math.pow(10,30),math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/30550000000)),0.0,6955000000.0),Body("Capricorn",0.0,-30550000000,1.9891*math.pow(10,30),math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/30550000000)),0.0,6955000000.0)]
 # Body("Planet X",152098232000.0,0.0,5.97219*math.pow(10,24),0,40340,63781000.0),
 #-math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/28550000000))
 
+#for body in bodies:
+#	print body.name, body.position.x, body.position.y
+def reset(currentOrbit):
+	global time,pause,cameraX,cameraY,distanceScaleFactor,bodies,allOrbits,maxdistance,mindistance
+	time = 0
+	pause = False
+	maxdistance = 0
+	mindistance = 1000000000000000000000000
+	cameraX = _screenWidth/2
+	cameraY = _screenHeight/2
+	maxdistance = 0
+	mindistance = 100000000000000000000000000000000000
+	distanceScaleFactor = 1/280000000.0
+	allOrbits = readOrbitFile()
+	bodies = createBodies(allOrbits[currentOrbit])
+	print 'reset'
 
-for body in bodies:
-	print body.name, body.position.x, body.position.y
-
+buttons = [Button(0,_screenHeight-70,150,'pause','pause'),Button(0,_screenHeight-35,150,'reset','reset')]
+reset(currentOrbit)
 while True:
 	PREVIOUSscreenWidth = _screenWidth
 	PREVIOUSscreenHeight = _screenHeight
 	PREVIOUSisLeftMouseDown = isLeftMouseDown()
+	PREVIOUSkeyZ = isKeyDown('z')
+	PREVIOUSkeyX = isKeyDown('x')
 	newFrame()
 	scroll = getMouseWheelDelta()
 	if scroll >= 120:
@@ -162,10 +227,11 @@ while True:
 		cameraX = _screenWidth/2
 		cameraY = _screenHeight/2
 		if pause:
-			buttons = [Button(0,_screenHeight-35,150,'play','play')]
+			buttons = [Button(0,_screenHeight-70,150,'play','play')]
 		else:
-			buttons = [Button(0,_screenHeight-35,150,'pause','pause')]
-
+			buttons = [Button(0,_screenHeight-70,150,'pause','pause')]
+		buttons.append(Button(0,_screenHeight-35,150,'reset','reset'))
+	resetOrbit = False
 	isCenterButton = 'not'
 	isZoomButton = 'not'
 	for i in range(len(buttons),0,-1):
@@ -179,58 +245,72 @@ while True:
 			if buttons[j].returnValue == 'pause':
 				pause = True
 				buttons.pop(j)
-				buttons.append(Button(0,_screenHeight-35,150,'play','play'))
+				buttons.append(Button(0,_screenHeight-70,150,'play','play'))
 			elif buttons[j].returnValue == 'play':
 				pause = False
 				buttons.pop(j)
-				buttons.append(Button(0,_screenHeight-35,150,'pause','pause'))
-			
+				buttons.append(Button(0,_screenHeight-70,150,'pause','pause'))
+			resetOrbit = buttons[j].returnValue == 'reset'
 		if buttons[j].text == 'center':
 			isCenterButton = j
 		if buttons[j].text == 'reset zoom':
 			isZoomButton = j		
 		buttons[j].draw()
+	if resetOrbit:
+		reset(currentOrbit)
+	else:
+		if isCenterButton == 'not':
+			if cameraX != _screenWidth/2 or cameraY != _screenHeight/2:
+				buttons.append(Button(0,_screenHeight-35*(len(buttons)+1),150,'center','center'))
+		elif cameraX == _screenWidth/2 and cameraY == _screenHeight/2:
+			buttons.pop(isCenterButton)
 
-	if isCenterButton == 'not':
-		if cameraX != _screenWidth/2 or cameraY != _screenHeight/2:
-			buttons.append(Button(0,_screenHeight-35*(len(buttons)+1),150,'center','center'))
-	elif cameraX == _screenWidth/2 and cameraY == _screenHeight/2:
-		buttons.pop(isCenterButton)
+		if isZoomButton == 'not':
+			if distanceScaleFactor != 1/280000000.0:
+				buttons.append(Button(0,_screenHeight-35*(len(buttons)+1),150,'reset zoom','unzoom'))
+		elif distanceScaleFactor == 1/280000000.0:
+			buttons.pop(isZoomButton)
 
-	if isZoomButton == 'not':
-		if distanceScaleFactor != 1/280000000.0:
-			buttons.append(Button(0,_screenHeight-35*(len(buttons)+1),150,'reset zoom','unzoom'))
-	elif distanceScaleFactor == 1/280000000.0:
-		buttons.pop(isZoomButton)
-
-	if not pause:
-		time += 1
-		i = 0
-		for body1 in bodies[:-1]:
-			i += 1
-			for body2 in bodies[i:]:
-				force1,force2 = gravity(body1.mass,body1.position,body2.mass,body2.position)
+		if not pause:
+			time += 1
+			i = 0
+			for body1 in bodies[:-1]:
+				i += 1
+				for body2 in bodies[i:]:
+					distance = Vector2D(body2.position.x-body1.position.x,body2.position.y-body1.position.y) # distance from body1 to body2
+					force1,force2 = gravity(body1.mass,body2.mass,distance)
 		
-				body1.handleForce(force1)
-				body2.handleForce(force2)
-				if time % 50 == 0:
-					print body1.name, body1.force.x, force1.x, body1.force.x + force1.x
-					print body2.name, body2.force.x, force1.x, body2.force.x + force2.x
-	
+					body1.handleForce(force1)
+					body2.handleForce(force2)
+					
+			for body in bodies:
+				body.move()
+				if body.name == 'Planet 0080FF':
+					body.position.update()
+					if body.position.power > maxdistance:
+						maxdistance = body.position.power
+					if body.position.power < mindistance:
+						mindistance = body.position.power
+				
+
 		for body in bodies:
-			body.move()
-
-	for body in bodies:
-		body.draw()
+			body.draw()
 	
 	
-	printScales()
-
-	if isKeyDown('UP'):
-		cameraY -= 10
-	if isKeyDown('DOWN'):
-		cameraY += 10
-	if isKeyDown('LEFT'):
-		cameraX += 10
-	if isKeyDown('RIGHT'):
-		cameraX -= 10
+		printScales()
+		if isKeyDown('z')and not PREVIOUSkeyZ:
+			if currentOrbit != 0:
+				currentOrbit -= 1
+				reset(currentOrbit)
+		if isKeyDown('x')and not PREVIOUSkeyX:
+			if currentOrbit < len(allOrbits)-1:
+				currentOrbit += 1
+				reset(currentOrbit)
+		if isKeyDown('UP'):
+			cameraY -= 10
+		if isKeyDown('DOWN'):
+			cameraY += 10
+		if isKeyDown('LEFT'):
+			cameraX += 10
+		if isKeyDown('RIGHT'):
+			cameraX -= 10
