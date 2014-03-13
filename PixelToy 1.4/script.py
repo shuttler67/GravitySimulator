@@ -2,20 +2,11 @@ import math
 
 buttonUp = loadImage('res/buttonUp.png')
 buttonDown = loadImage('res/buttonDown.png')
-
-G =  6.67428*math.pow(10,-11) #gravitational constant, unit: N(m/kg)^2 
-time = 0
-pause = False
-maxdistance = 0
-mindistance = 1000000000000000000000000
-cameraX = _screenWidth/2
-cameraY = _screenHeight/2
-
-distanceScaleFactor = 1/280000000.0
+G = 6.67128190396*10**-11
 #time unit: seconds
 #mass unit: kilograms
 #distance unit: meters
-
+timeSpeed = 86400
 def drawImageRect(image,rect):
 		drawImage(image,rect.x1+rect.width/2,rect.y1+rect.height/2,rect.width,rect.height)
 
@@ -23,15 +14,7 @@ def scaleMetersToPixels(distance):
 	return distance*distanceScaleFactor
 
 def gravity(body1Mass,body1Position,body2Mass,body2Position):
-	global maxdistance, mindistance
 	distance = Vector2D(body2Position.x-body1Position.x,body2Position.y-body1Position.y) # distance from self to body2
-	if distance.power > maxdistance:
-		maxdistance = distance.power
-		print "MAX",maxdistance, bodies[0].position.x, bodies[0].position.y
-	if distance.power < mindistance:
-		mindistance = distance.power
-		print "MIN",mindistance, bodies[0].position.x, bodies[0].position.y
-
 	force = G*(body1Mass*body2Mass) / math.pow(distance.power,2) # indirectional force acting on both bodies
 	force1 = Vector2D(distance.x/distance.power * force, distance.y/distance.power * force) # directional force acting on body1
 	force2 = Vector2D(distance.x/distance.power *-force, distance.y/distance.power *-force) # directional force acting on body2 (opposite direction of force1)
@@ -122,28 +105,39 @@ class Body:
 	def move(self): 		
 		self.acceleration.x += self.force.x/self.mass
 		self.acceleration.y += self.force.y/self.mass	
-		self.velocity.x += self.acceleration.x*86400
-		self.velocity.y += self.acceleration.y*86400
-		self.position.x += self.velocity.x*86400
-		self.position.y += self.velocity.y*86400
+		self.velocity.x += self.acceleration.x*timeSpeed*10
+		self.velocity.y += self.acceleration.y*timeSpeed*10
+		self.position.x += self.velocity.x*timeSpeed*10
+		self.position.y += self.velocity.y*timeSpeed*10
 		self.acceleration = Vector2D(0.0,0.0)
 		self.force = Vector2D(0.0,0.0)
 	def draw(self):
 		self.trace.append((self.position.x,self.position.y))
-		if self.name == "Sun":
+		if self.name == "Vega":
 			useColour(255,0,0,255)
-		else:
-			useColour(0,0,255,255)
+		elif self.name == "Planet 0080FF":
+			useColour(0,128,255,255)
+		elif self.name == "Capricorn":
+			useColour(255,128,0,255)
 		drawCircle(scaleMetersToPixels(self.position.x)+cameraX,scaleMetersToPixels(self.position.y)+cameraY,scaleMetersToPixels(self.radius))
 		drawString(scaleMetersToPixels(self.position.x)-len(self.name)*5+cameraX,scaleMetersToPixels(self.position.y)-scaleMetersToPixels(self.radius)-17+cameraY,self.name)
 		for point in self.trace:
 			drawPoint(scaleMetersToPixels(point[0])+cameraX,scaleMetersToPixels(point[1])+cameraY)
-print math.sqrt(G*1.9891*math.pow(10,30)*(2.0/30550000000.0-1.0/30550000000.0)
-bodies = [Body("Vega",0.0,30550000000,1.9891*math.pow(10,30),math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/30550000000)),0.0,6955000000.0),Body("Capricorn",0.0,-30550000000,1.9891*math.pow(10,30),math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/30550000000)),0.0,6955000000.0)]
-# Body("Planet X",152098232000.0,0.0,5.97219*math.pow(10,24),0,40340,63781000.0),
+
+sunspeed = math.sqrt(G*1.9891*math.pow(10,30)*(2.0/60550000000.0-1.0/40550000000.0))/2
+def reset():
+	global time,pause,cameraX,cameraY,distanceScaleFactor,buttons,bodies
+	time = 0
+	pause = False
+	cameraX = _screenWidth/2
+	cameraY = _screenHeight/2
+	distanceScaleFactor = 1/280000000.0	
+	buttons = [Button(0,_screenHeight-35,150,'pause','pause'),Button(0,_screenHeight-70,150,'reset','reset')]
+	bodies = [Body("Vega",0.0,60550000000,1.9891*math.pow(10,30),sunspeed,0.0,6955000000.0),Body("Capricorn",0.0,-60550000000,1.9891*math.pow(10,30),-sunspeed,0.0,6955000000.0),Body("Planet 0080FF",152098232000.0,0.0,5.97219*math.pow(10,24),0,50340,63781000.0)]
+# Body("Planet 0080FF",152098232000.0,0.0,5.97219*math.pow(10,24),0,40340,63781000.0),
 #-math.sqrt(G*1.9891*math.pow(10,30)*(2/30550000000-1/28550000000))
 
-
+reset()
 for body in bodies:
 	print body.name, body.position.x, body.position.y
 
@@ -165,12 +159,15 @@ while True:
 			buttons = [Button(0,_screenHeight-35,150,'play','play')]
 		else:
 			buttons = [Button(0,_screenHeight-35,150,'pause','pause')]
+		buttons.append(Button(0,_screenHeight-70,150,'reset','reset'))
 
 	isCenterButton = 'not'
 	isZoomButton = 'not'
 	for i in range(len(buttons),0,-1):
 		j = i-1
 		if not isLeftMouseDown() and PREVIOUSisLeftMouseDown and buttons[j].isUnderMouse():
+			if buttons[j].returnValue == 'reset':
+				reset()
 			if buttons[j].returnValue == 'center':
 				cameraX = _screenWidth/2
 				cameraY = _screenHeight/2
@@ -204,7 +201,7 @@ while True:
 		buttons.pop(isZoomButton)
 
 	if not pause:
-		time += 1
+		time += 5
 		i = 0
 		for body1 in bodies[:-1]:
 			i += 1
@@ -213,9 +210,9 @@ while True:
 		
 				body1.handleForce(force1)
 				body2.handleForce(force2)
-				if time % 50 == 0:
-					print body1.name, body1.force.x, force1.x, body1.force.x + force1.x
-					print body2.name, body2.force.x, force1.x, body2.force.x + force2.x
+#				if time % 50 == 0:
+#					print body1.name, body1.force.x, force1.x, body1.force.x + force1.x
+#					print body2.name, body2.force.x, force1.x, body2.force.x + force2.x
 	
 		for body in bodies:
 			body.move()
